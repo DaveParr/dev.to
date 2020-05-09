@@ -1,34 +1,55 @@
 ---
-title: "R Notebook"
+title: "Introducing the pokedex R package"
 output: github_document
 ---
 
+I made an R data package to make Pokemon data more usable in R! 
+
 ```{r setup}
-library(tidyverse)
 library(pokedex)
+library(tidyverse)
+library(knitr)
 ```
 
-```{r table}
-pokemon %>% 
-  select(identifier, type_1, type_2)
-```
+# How many Pokemon in the package?
 
-# How many pokemon?
+I've tried to make the data set 'tidy' from the start, so we can use `summarise` to count them, and `kable` to make some dev.to friendly markdown tables.
 
 ```{r total count}
 pokemon %>% 
-  summarise(count = n())
+  summarise(count = n()) %>% 
+  kable()
 ```
 
-## How many by type?
+# Types
+
+Types are pretty key to Pokemon. Lets have a quick look at the Kanto starters and types.
+
+```{r table}
+pokemon %>% 
+  top_n(n = -9, wt = species_id) %>% 
+  select(identifier, type_1, type_2) %>%
+  kable()
+```
+
+## Single and dual types
+
+So Pokemon can have either 1 or 2 types. What's the split between single type and dual type Pokemon?
 
 ```{r count of dual and single types}
 pokemon %>%
   mutate(dual_type = case_when(is.na(type_2) ~ TRUE,
                                TRUE ~ FALSE)) %>%
   group_by(dual_type) %>%
-  summarise(count = n())
+  summarise(count = n()) %>% 
+  kable()
 ```
+
+So, it's nearly a 50:50 split of Pokemon that are single type to pokemon that have 2 types.
+
+## How many by type?
+
+But there are also quite a few types of Pokemon. Starting with the primary type, lets make a quick chart to understand the distribution of primary types. Using `group_by` will mean the `summarise` gets calculated _per group_. We can then pipe directly into `ggplot` for a col chart with `geom_col`.
 
 ```{r primary type}
 pokemon %>%
@@ -39,6 +60,8 @@ pokemon %>%
   labs(title = "Pokemon by primary type")
 ```
  
+Lots of water type pokemon, and lot's of normal type pokemon, but very few flying types. Interesting. How about the secondary types?
+
 ```{r secondary type}
 pokemon %>% 
   filter(!is.na(type_2)) %>% 
@@ -49,6 +72,10 @@ pokemon %>%
   labs(title = "Pokemon by secondary type",
        caption = "For Pokemon with dual type")
 ```
+
+Look at all those 'mons with flying as a secondary type! The thing is that, game-wise, the _order_ of the typing doesn't matter. We can easily count the occurance of a specific type in either primary or secondary position with `pivot_longer`.
+
+`pivot_longer` is actually a newer tidyverse function. It is complemented with `pivot_wider` and this pair are intended to eventually replace `spread` and `gather`. By filtering out the `NA` I remove any observations of secondary types for Pokemon that don't actually have them.
 
 ```{r either type}
 pokemon %>% 
@@ -63,7 +90,7 @@ pokemon %>%
        caption = "This will count a dual type pokemon twice,\nonce for each type")
 ```
 
-Type order doesn't actually matter
+So is there any consistency in order at all?
 
 ```{r ghost fire is a fire ghost}
 pokemon %>%
@@ -71,6 +98,12 @@ pokemon %>%
            (type_1 == "fire" & type_2 == "ghost")) %>% 
   select(identifier, type_1, type_2)
 ```
+
+It doesn't look like it. a `ghost fire` Pokemon and a `fire ghost` Pokemon both turn up. I'd like to see what the coincidence rate is of each type in dual type Pokemon, so I need to get some ordering in. I can use `case_when` in `mutate` to create a two new columns in the data. I can make 2 in one call because `mutate` supports multiple _expressions_, each of which names a column, and then operates conditionally on the other 2 type columns. These new columns will:
+
+* always have a value in the column `type_1_ordered`
+* if the pokemon is dual type, have a value in `type_2_ordered`
+* always have the types alphabetically ordered between the two columns. i.e. it will always be `fire, ghost`, never `ghost, fire`.
 
 ```{r consistent typing}
 pokemon %>%
@@ -82,6 +115,8 @@ pokemon %>%
                                TRUE ~ type_2)
   ) -> pokemon
 ```
+
+What might the distribution be of the flying secondary type, per primary type?
 
 ```{r count dual type}
 pokemon %>%
@@ -96,8 +131,11 @@ pokemon %>%
   ggplot(aes(x = type_combined, y = count)) +
   geom_col() +
   labs(title = "Count of Pokemon by dual type",
-       caption = "Ordered by count")
+       caption = "Ordered by count") + 
+  theme(axis.text.x = element_text(angle = 90))
 ```
+
+So the most often occuring dual type is flying normal. That explains the first 2 charts. It's a bit tricky to see the rest though. Lets make a more useful plot.
 
 ```{r covariance by type}
 pokemon %>% 
@@ -109,11 +147,25 @@ pokemon %>%
   labs(title = "Coincidence of a particular dual type")
 ```
 
-```{r what types dont exist at all}
-expand(pokedex$types %>%
-         filter(id < 10001),
-       pokedex$types %>%
-         filter(id < 10001))
+So `flying normal` has the biggest count, with there being quite a few `bug flying`. That makes sense, as so many bug Pokemon have wings! There are also lot's od `bug poison` and `grass poison`. That makes sense too, as so many bugs and plants are poisonous! How many Pokemon have unique types though?
 
+```{r covariance by type}
+pokemon %>% 
+  group_by(type_1_ordered, type_2_ordered) %>% 
+  filter(!is.na(type_2_ordered)) %>% 
+  summarise(count = n()) %>% 
+  filter(count == 1) %>% 
+  ungroup() %>% 
+  summarise(count = n())
 ```
+
+24 Pokemon have unique dual types. Out of 807 that isn't very many! Maybe these Pokemon might be particularly useful? I'll try and work it out...
+
+# Game Over
+
+This post has been a simple example of both the data in the package, but also the `tidyverse` methods of doing Exploratory Data Analysis. You can find out more about tidyverse [here](https://www.tidyverse.org/)
+
+I got the raw data from this repo by veekun. My package is avaiable here. Though it's in a pretty raw state, I hope to improve over time. 
+
+I made this package to have a big, diverse set of data to play with, that lots of people recognise, and that has some inherent real world application. Pokemon is a huge franchise with multiple installments. Lots of people have played it, and even if you haven't you probably have an intuition about what a Pokemon is, and what data about a Pokemon might make sense, and mean in context with other Pokemon. Feel free to fork and mess around with as you like. I hope its fun, and maybe even useful!
 
