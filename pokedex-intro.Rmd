@@ -1,0 +1,119 @@
+---
+title: "R Notebook"
+output: github_document
+---
+
+```{r setup}
+library(tidyverse)
+library(pokedex)
+```
+
+```{r table}
+pokemon %>% 
+  select(identifier, type_1, type_2)
+```
+
+# How many pokemon?
+
+```{r total count}
+pokemon %>% 
+  summarise(count = n())
+```
+
+## How many by type?
+
+```{r count of dual and single types}
+pokemon %>%
+  mutate(dual_type = case_when(is.na(type_2) ~ TRUE,
+                               TRUE ~ FALSE)) %>%
+  group_by(dual_type) %>%
+  summarise(count = n())
+```
+
+```{r primary type}
+pokemon %>%
+  group_by(type_1) %>%
+  summarise(count = n()) %>%
+  ggplot(aes(x = type_1, y = count)) +
+  geom_col() +
+  labs(title = "Pokemon by primary type")
+```
+ 
+```{r secondary type}
+pokemon %>% 
+  filter(!is.na(type_2)) %>% 
+  group_by(type_2) %>% 
+  summarise(count = n()) %>% 
+  ggplot(aes(x = type_2, y = count)) +
+  geom_col() +
+  labs(title = "Pokemon by secondary type",
+       caption = "For Pokemon with dual type")
+```
+
+```{r either type}
+pokemon %>% 
+  select(identifier, type_1, type_2) %>% 
+  pivot_longer(-identifier, names_to = "slot", values_to = "type") %>% 
+  group_by(type) %>% 
+  summarise(count = n()) %>% 
+  filter(!is.na(type)) %>% 
+  ggplot(aes(x = type, y = count)) +
+  geom_col() +
+  labs(title = "Pokemon by either type",
+       caption = "This will count a dual type pokemon twice,\nonce for each type")
+```
+
+Type order doesn't actually matter
+
+```{r ghost fire is a fire ghost}
+pokemon %>%
+  filter((type_1 == "ghost" & type_2 == "fire") |
+           (type_1 == "fire" & type_2 == "ghost")) %>% 
+  select(identifier, type_1, type_2)
+```
+
+```{r consistent typing}
+pokemon %>%
+  mutate(
+    type_1_ordered = case_when(is.na(type_2) ~ type_1,
+                               type_1 < type_2 ~ type_1,
+                               TRUE ~ type_2),
+    type_2_ordered = case_when(type_1 > type_2 ~ type_1,
+                               TRUE ~ type_2)
+  ) -> pokemon
+```
+
+```{r count dual type}
+pokemon %>%
+  mutate(type_combined = case_when(
+    !is.na(type_2_ordered) ~ paste(type_1_ordered, type_2_ordered),
+    is.na(type_2_ordered) ~ type_1_ordered
+  )) %>%
+  group_by(type_combined) %>%
+  summarise(count = n()) %>%
+  arrange(desc(count)) %>%
+  mutate(type_combined = as_factor(type_combined)) %>%
+  ggplot(aes(x = type_combined, y = count)) +
+  geom_col() +
+  labs(title = "Count of Pokemon by dual type",
+       caption = "Ordered by count")
+```
+
+```{r covariance by type}
+pokemon %>% 
+  group_by(type_1_ordered, type_2_ordered) %>% 
+  filter(!is.na(type_2_ordered)) %>% 
+  summarise(count = n()) %>% 
+  ggplot(aes(x = type_1_ordered, y = type_2_ordered, size = count)) +
+  geom_point() +
+  labs(title = "Coincidence of a particular dual type")
+```
+
+```{r what types dont exist at all}
+expand(pokedex$types %>%
+         filter(id < 10001),
+       pokedex$types %>%
+         filter(id < 10001))
+
+```
+
