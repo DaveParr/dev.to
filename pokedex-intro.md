@@ -1,7 +1,10 @@
-R Notebook
+Introducing the pokedex R package
 ================
 
+I made an R data package to make Pokemon data more usable in R\!
+
 ``` r
+library(pokedex)
 library(tidyverse)
 ```
 
@@ -19,56 +22,78 @@ library(tidyverse)
     ## x dplyr::lag()    masks stats::lag()
 
 ``` r
-library(pokedex)
+library(knitr)
 ```
+
+# How many Pokemon in the package?
+
+I’ve tried to make the data set ‘tidy’ from the start, so we can use
+`summarise` to count them, and `kable` to make some dev.to friendly
+markdown tables.
 
 ``` r
 pokemon %>% 
-  select(identifier, type_1, type_2)
+  summarise(count = n()) %>% 
+  kable()
 ```
 
-    ## # A tibble: 807 x 3
-    ##    identifier type_1 type_2
-    ##    <chr>      <chr>  <chr> 
-    ##  1 bulbasaur  grass  poison
-    ##  2 ivysaur    grass  poison
-    ##  3 venusaur   grass  poison
-    ##  4 charmander fire   <NA>  
-    ##  5 charmeleon fire   <NA>  
-    ##  6 charizard  fire   flying
-    ##  7 squirtle   water  <NA>  
-    ##  8 wartortle  water  <NA>  
-    ##  9 blastoise  water  <NA>  
-    ## 10 caterpie   bug    <NA>  
-    ## # … with 797 more rows
+| count |
+| ----: |
+|   807 |
 
-# How many pokemon?
+# Types
+
+Types are pretty key to Pokemon. Lets have a quick look at the Kanto
+starters and types.
 
 ``` r
 pokemon %>% 
-  summarise(count = n())
+  top_n(n = -9, wt = species_id) %>% 
+  select(identifier, type_1, type_2) %>%
+  kable()
 ```
 
-    ## # A tibble: 1 x 1
-    ##   count
-    ##   <int>
-    ## 1   807
+| identifier | type\_1 | type\_2 |
+| :--------- | :------ | :------ |
+| bulbasaur  | grass   | poison  |
+| ivysaur    | grass   | poison  |
+| venusaur   | grass   | poison  |
+| charmander | fire    | NA      |
+| charmeleon | fire    | NA      |
+| charizard  | fire    | flying  |
+| squirtle   | water   | NA      |
+| wartortle  | water   | NA      |
+| blastoise  | water   | NA      |
 
-## How many by type?
+# Single and dual types
+
+So Pokemon can have either 1 or 2 types. What’s the split between single
+type and dual type Pokemon?
 
 ``` r
 pokemon %>%
   mutate(dual_type = case_when(is.na(type_2) ~ TRUE,
                                TRUE ~ FALSE)) %>%
   group_by(dual_type) %>%
-  summarise(count = n())
+  summarise(count = n()) %>% 
+  kable()
 ```
 
-    ## # A tibble: 2 x 2
-    ##   dual_type count
-    ##   <lgl>     <int>
-    ## 1 FALSE       405
-    ## 2 TRUE        402
+| dual\_type | count |
+| :--------- | ----: |
+| FALSE      |   405 |
+| TRUE       |   402 |
+
+So, it’s nearly a 50:50 split of Pokemon that are single type to Pokemon
+that have 2 types.
+
+# How many by type?
+
+But there are also quite a few types of Pokemon. Starting with the
+primary type, lets make a quick chart to understand the distribution of
+primary types. Using `group_by` will mean the `summarise` gets
+calculated *per group*. We can then pipe directly into `ggplot` for a
+col chart with `geom_col`.
 
 ``` r
 pokemon %>%
@@ -79,7 +104,10 @@ pokemon %>%
   labs(title = "Pokemon by primary type")
 ```
 
-![](pokedex-intro_files/figure-gfm/primary%20type-1.png)<!-- -->
+![](pokedex-intro_files/figure-gfm/primary_type-1.png)<!-- -->
+
+Lots of water type Pokemon, and lot’s of normal type Pokemon, but very
+few flying types. Interesting. How about the secondary types?
 
 ``` r
 pokemon %>% 
@@ -92,7 +120,18 @@ pokemon %>%
        caption = "For Pokemon with dual type")
 ```
 
-![](pokedex-intro_files/figure-gfm/secondary%20type-1.png)<!-- -->
+![](pokedex-intro_files/figure-gfm/secondary_type-1.png)<!-- -->
+
+Look at all those ’mons with flying as a secondary type\! The thing is
+that, game-wise, the *order* of the typing doesn’t matter. We can easily
+count the occurrence of a specific type in either primary or secondary
+position with `pivot_longer`.
+
+`pivot_longer` is actually a newer tidyverse function. It is
+complemented with `pivot_wider` and this pair are intended to eventually
+replace `spread` and `gather`. By filtering out the `NA` I remove any
+observations of secondary types for Pokemon that don’t actually have
+them.
 
 ``` r
 pokemon %>% 
@@ -104,12 +143,12 @@ pokemon %>%
   ggplot(aes(x = type, y = count)) +
   geom_col() +
   labs(title = "Pokemon by either type",
-       caption = "This will count a dual type pokemon twice,\nonce for each type")
+       caption = "This will count a dual type Pokemon twice,\nonce for each type")
 ```
 
-![](pokedex-intro_files/figure-gfm/either%20type-1.png)<!-- -->
+![](pokedex-intro_files/figure-gfm/either_type-1.png)<!-- -->
 
-Type order doesn’t actually matter
+So is there any consistency in order at all?
 
 ``` r
 pokemon %>%
@@ -126,6 +165,21 @@ pokemon %>%
     ## 3 chandelure  ghost  fire  
     ## 4 blacephalon fire   ghost
 
+It doesn’t look like it. a `ghost fire` Pokemon and a `fire ghost`
+Pokemon both turn up. I’d like to see what the coincidence rate is of
+each type in dual type Pokemon, so I need to get some ordering in. I can
+use `case_when` in `mutate` to create a two new columns in the data. I
+can make 2 in one call because `mutate` supports multiple *expressions*,
+each of which names a column, and then operates conditionally on the
+other 2 type columns. These new columns will:
+
+  - always have a value in the column `type_1_ordered`
+  - if the Pokemon is dual type, have a value in `type_2_ordered`
+  - always have the types alphabetically ordered between the two
+    columns. i.e. it will always be `fire, ghost`, never `ghost, fire`.
+
+<!-- end list -->
+
 ``` r
 pokemon %>%
   mutate(
@@ -136,6 +190,9 @@ pokemon %>%
                                TRUE ~ type_2)
   ) -> pokemon
 ```
+
+What might the distribution be of the flying secondary type, per primary
+type?
 
 ``` r
 pokemon %>%
@@ -150,10 +207,15 @@ pokemon %>%
   ggplot(aes(x = type_combined, y = count)) +
   geom_col() +
   labs(title = "Count of Pokemon by dual type",
-       caption = "Ordered by count")
+       caption = "Ordered by count") + 
+  theme(axis.text.x = element_text(angle = 90))
 ```
 
-![](pokedex-intro_files/figure-gfm/count%20dual%20type-1.png)<!-- -->
+![](pokedex-intro_files/figure-gfm/count_dual_type-1.png)<!-- -->
+
+So the most often occurring dual type is flying normal. That explains
+the first 2 charts. It’s a bit tricky to see the rest though. Lets make
+a more useful plot.
 
 ``` r
 pokemon %>% 
@@ -165,33 +227,51 @@ pokemon %>%
   labs(title = "Coincidence of a particular dual type")
 ```
 
-![](pokedex-intro_files/figure-gfm/covariance%20by%20type-1.png)<!-- -->
+![](pokedex-intro_files/figure-gfm/covariance_by_type-1.png)<!-- -->
+
+So `flying normal` has the biggest count, with there being quite a few
+`bug flying`. That makes sense, as so many bug Pokemon have wings\!
+There are also lot’s of `bug poison` and `grass poison`. That makes
+sense too, as so many bugs and plants are poisonous\! How many Pokemon
+have unique types though?
 
 ``` r
-expand(pokedex$types %>%
-         filter(id < 10001),
-       pokedex$types %>%
-         filter(id < 10001))
+pokemon %>% 
+  group_by(type_1_ordered, type_2_ordered) %>% 
+  filter(!is.na(type_2_ordered)) %>% 
+  summarise(count = n()) %>% 
+  filter(count == 1) %>% 
+  ungroup() %>% 
+  summarise(count = n()) %>% 
+  kable()
 ```
 
-    ## # A tibble: 18 x 4
-    ##       id identifier generation_id damage_class_id
-    ##    <dbl> <chr>              <dbl>           <dbl>
-    ##  1     1 normal                 1               2
-    ##  2     2 fighting               1               2
-    ##  3     3 flying                 1               2
-    ##  4     4 poison                 1               2
-    ##  5     5 ground                 1               2
-    ##  6     6 rock                   1               2
-    ##  7     7 bug                    1               2
-    ##  8     8 ghost                  1               2
-    ##  9     9 steel                  2               2
-    ## 10    10 fire                   1               3
-    ## 11    11 water                  1               3
-    ## 12    12 grass                  1               3
-    ## 13    13 electric               1               3
-    ## 14    14 psychic                1               3
-    ## 15    15 ice                    1               3
-    ## 16    16 dragon                 1               3
-    ## 17    17 dark                   2               3
-    ## 18    18 fairy                  6              NA
+| count |
+| ----: |
+|    24 |
+
+24 Pokemon have unique dual types. Out of 807 that isn’t very many\!
+Maybe these Pokemon might be particularly useful? I’ll try and work it
+out…
+
+# Game Over
+
+This post has been a simple example of both the data in the package, but
+also the `tidyverse` methods of doing Exploratory Data Analysis. You can
+find out more about tidyverse [here](https://www.tidyverse.org/)
+
+I got the raw data from [this repo by
+veekun](https://github.com/veekun/pokedex). My package is available
+[here](https://github.com/DaveParr/pokedex), and the particular version
+I used for this post is
+[here](https://github.com/DaveParr/pokedex/commit/67638e8bc52d58bb0c38534b7c2acc9a78b42053).
+Though it’s in a pretty raw state, I hope to improve over time.
+
+I made this package to have a bigish, diverse set of data to play with,
+that lots of people recognise, and that has some inherent real world
+application. Pokemon is a huge franchise with multiple instalments. Lots
+of people have played it, and even if you haven’t you probably have an
+intuition about what a Pokemon is, and what data about a Pokemon might
+make sense, and mean in context with other Pokemon. Feel free to fork
+and mess around with as you like. I hope its fun, and maybe even
+useful\!
