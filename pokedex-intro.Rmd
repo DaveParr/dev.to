@@ -156,7 +156,8 @@ pokemon %>%
   summarise(count = n()) %>% 
   filter(count == 1) %>% 
   ungroup() %>% 
-  summarise(count = n())
+  summarise(count = n()) %>% 
+  kable()
 ```
 
 24 Pokemon have unique dual types. Out of 807 that isn't very many! Maybe these Pokemon might be particularly useful? I'll try and work it out...
