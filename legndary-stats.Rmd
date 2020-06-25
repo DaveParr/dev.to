@@ -1,0 +1,92 @@
+---
+title: "Classifying legendary pokemon"
+---
+
+```{r setup}
+library(pokedex)
+library(tidyverse)
+library(GGally)
+```
+
+## Key stats
+
+Pokemon have some key stats, lets look at how they correlate and are distributed
+
+```{r}
+ggpairs(
+  pokemon %>%
+    select(
+      base_experience,
+      hp,
+      attack,
+      defense,
+      special_attack,
+      special_defense,
+      speed
+    ),
+  lower = list(continuous = "density"),
+  progress = FALSE
+)
+```
+
+Base experience corellates the most strongly with all the 6 other stats
+has 3 distinct groups
+
+Special defense and defense correlate well
+
+Negative corellation between speed and defense
+  + Weak corelation between speed and hp and speed and special defense
+
+## Is this evolution?
+
+Lets make a (rough) estimate of how far down an evolutionary line a creature is
+
+
+```{r}
+pokemon %>% 
+  filter(identifier == "eevee" | evolution_chain_id == 67)
+```
+
+```{r}
+pokemon %>% filter(is.na(evolution_chain_id))
+  group_by(evolution_chain_id) %>%
+  summarise( n = n())
+```
+
+
+```{r}
+ggpairs(
+  pokemon_plus %>%
+    select(
+      evo_steps,
+      base_experience,
+      hp,
+      attack,
+      defense,
+      special_attack,
+      special_defense,
+      speed,
+      stats_total
+    ),
+  lower = list(continuous = "density"),
+  progress = FALSE
+)
+```
+
+* generally stats increase up the evo steps
+* base-exp has gap, then the top figure, legendary pkmn
+* hp also closely mirrors, higher level = more damage to deal with
+
+## Split point for  legendary pokemon
+
+```{r}
+ggplot(pokemon_plus, aes(base_experience, evo_steps)) +
+  geom_point()
+```
+
+```{r}
+pokemon_plus %>% 
+  filter(base_experience > 200 & evo_steps == 1) %>% 
+  arrange(stats_total)
+```
+
