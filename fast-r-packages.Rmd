@@ -1,7 +1,6 @@
 ---
 title: "Writing R packages, fast"
 output: github_document
-series: "dev.to.ol"
 published: FALSE
 tags: ["Rstats", "packages", "tools"]
 ---
@@ -34,6 +33,7 @@ You'll also have a few other files and folders. `man` will hold the manual, or d
 I talked about [`usethis`](https://usethis.r-lib.org/) in my [last post](https://dev.to/daveparr/testing-my-dev-to-api-package-with-testthat-webmockr-and-vcr-2dgm), but didn't do it nearly the justice it deserves. The best place to start is [Usage](https://usethis.r-lib.org/#usage) and then have a look at the [Reference](https://usethis.r-lib.org/reference/index.html).
 
 In my projects I tend to use these functions to set up each one:
+
 * `use_pipe()` to allow the package to use pipes from `magrittr`
 * `use_testthat()` to set up tests that for the package
 * `use_package()` to include a dependency, such as `ggplot2` or `readr`
@@ -42,6 +42,7 @@ In my projects I tend to use these functions to set up each one:
 * `use_badge()` to fill in those Readmes with badges
 
 And then to write my package I tend to use these functions to write it:
+
 * `use_r()` to create a new R file to source
 * `use_test()` to create a new test for a specific open R file
 * `use_data()` to include data sets in my packages
@@ -179,7 +180,7 @@ Go back to your `./R/hello.R` file, and ditch those boring vanilla `#` comments.
 #' @export 
 ```
 
-So [sinew](https://yonicd.github.io/sinew/) has built us a template for Roxygen, and put the function name in? Cute, but I don't need that two write one word for me. OK, how about something a big more real world. I've been making a wrapper for the dev.to API (using all these methods). If I go get my `post_new_article` function and run `sinew::makeOxygen(post_new_article)`:
+So [sinew](https://yonicd.github.io/sinew/) has built us a template for Roxygen, and put the function name in? Cute, but I don't need that to write one word for me. OK, how about something a bit more real world. I've been [making a wrapper for the dev.to API](https://dev.to/daveparr/posting-straight-from-rmd-to-dev-to-1j4p) (using all these methods). If I go get my `post_new_article` function and run `sinew::makeOxygen(post_new_article)`:
 
 ```r
 #' @title FUNCTION_TITLE
@@ -209,10 +210,11 @@ So [sinew](https://yonicd.github.io/sinew/) has built us a template for Roxygen,
 #' @importFrom httr POST add_headers
 ```
 
-This is my output. Sinew inspects my function, and then _derives_ the functions I need to import and adds them to the Roxygen comment block. It also links the functions in the `@seealso` which will show up in the docs. Remember that these now get _automatically_ added to the `NAMESPACE` and `DESCRIPTIONS` where they need to be, each time I document my package. it's also understood what arguments my function takes, and populated them with the defaults, if present. Now, why would you bother writing this by hand any more?
+This is my output. Sinew inspects my function, and then _derives_ the functions I need to import and adds them to the Roxygen comment block. It also links the functions in the `@seealso` which will show up in the docs. Remember that these now get _automatically_ added to the `NAMESPACE` and `DESCRIPTIONS` where they need to be, each time I document my package. It's also understood what arguments my function takes, and populated them with the defaults, if present. Now, why would you bother writing this by hand any more?
 
 # TL;DR
 
 1. Start your package in the RStudio IDE as a new project
 2. Set up your package with `usethis`
 3. Populate your Roxygen comments with `sinew`
+4. Profit!
