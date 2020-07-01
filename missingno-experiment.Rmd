@@ -6,19 +6,19 @@ tags: ['rstats', 'datascience']
 output: github_document
 ---
 
-```{r setup}
-library(pokedex)
-library(tidyverse)
-library(naniar)
-library(skimr)
-```
-
 ## Wild missingno appeared!
 
 ![Battle entry animation of a 'wild missingno appeared' from pokemon red/blue](https://media2.giphy.com/media/G7rSYPWEeTjY4/giphy.gif?cid=ecf05e47f8faf1991ba53b479305d68e25326d15db3d6769&rid=giphy.gif) 
 Missingno is the patron Pokemon of data science. You're just casually surfing up and down your data, doing some sweet coding, when suddenly a bunch of missing and corrupted data gets in you way, and you suddenly have a bunch of random items in your bag for no reason. OK, well maybe I just have a messy bag.
 
 The valuable part of this metaphor is the part where you battle Missingno, and win. I've been doing this with my Pokedex project recently, to try and iron out what data I can rely on from my data source, and what's a bit patchy.
+
+```{r setup, message=FALSE}
+library(pokedex)
+library(tidyverse)
+library(naniar)
+library(skimr)
+```
 
 ## Go, Skimr!
 
@@ -71,7 +71,7 @@ pokemon %>%
   filter(across(missing_cols, ~is.na(.x))) %>% 
   select(name, identifier, missing_cols) -> missing_pokes
 
-missing_pokes
+missing_pokes %>% knitr::kable()
 ```
 
 So it looks like in the current version of the package, these Pokemon all have 'complex' identifiers. This is because these Pokemon all have different forms. Some vary by colour like [Basculin](https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_with_form_differences#Basculin) which can be Red or Blue striped, others have ability transformations, like [Aegislash](https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_with_form_differences#Aegislash) or which game it was caught in like [Deoxys](https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_with_form_differences#Deoxys).
@@ -85,15 +85,14 @@ pokedex$pokemon_species %>%
   filter(
     stringr::str_to_lower(identifier) %in% missing_pokes_name_list
     ) %>% 
-  select(identifier, generation_id, evolves_from_species_id, shape_id, color_id)
+  select(identifier, generation_id, evolves_from_species_id, shape_id, color_id) %>% 
+  knitr::kable()
 ```
 
 If we go back to the raw source data, we can see that the data is actually there for most cases, it just didn't join properly because in the source data, they are identified by the simple name, in lower case, and in [this version of the package](https://github.com/DaveParr/pokedex/blob/ebe078c291ffa4eb757d09e0641553de63c5a530/data-raw/pokemon.R#L59-L61) this data is joined on `id` AND the column that actually has the complex name. Also, because shape and color link _through_ this data, they are missed as well!
 
 ## You defeated wild missingno!
 
-This is all based on my Pokedex R data package.
+This is all based on my Pokedex R data package, which I'm just about to fix :)
 
 {% github daveparr/pokedex %}
-
-You can check the commits and see the solution...
