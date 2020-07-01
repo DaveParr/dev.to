@@ -1,0 +1,99 @@
+---
+title: "The Missingno Experiment and Multiple Form Pokemon"
+description: "Understanding missingness in Pokemon data using R"
+series: "pokedex"
+tags: ['rstats', 'datascience']
+output: github_document
+---
+
+```{r setup}
+library(pokedex)
+library(tidyverse)
+library(naniar)
+library(skimr)
+```
+
+## Wild missingno appeared!
+
+![Battle entry animation of a 'wild missingno appeared' from pokemon red/blue](https://media2.giphy.com/media/G7rSYPWEeTjY4/giphy.gif?cid=ecf05e47f8faf1991ba53b479305d68e25326d15db3d6769&rid=giphy.gif) 
+Missingno is the patron Pokemon of data science. You're just casually surfing up and down your data, doing some sweet coding, when suddenly a bunch of missing and corrupted data gets in you way, and you suddenly have a bunch of random items in your bag for no reason. OK, well maybe I just have a messy bag.
+
+The valuable part of this metaphor is the part where you battle Missingno, and win. I've been doing this with my Pokedex project recently, to try and iron out what data I can rely on from my data source, and what's a bit patchy.
+
+## Go, Skimr!
+
+Skimr gives us a text based summary view. As well as the basics on data set size, it also shows us some statistical values, but most valuably it describes how many values are missing, and in what columns.
+
+```{r skimr}
+pokemon %>% 
+  skimr::skim()
+```
+
+I was expecting some missing data in `type_2`, and `evolves_from_species_id`, but I wasn't expecting only half of `habitat` to be there. Either I broke something in my data pipeline, or the data wasn't there to begin with. `colour`, `shape`, `generation_id` and `evolution_chain_id` are all missing 20 entries each, which is a bit or a coincidence. I wonder if they are all missing from the same Pokemon?
+
+## Visdat I choose you!
+
+`visdat` is a package that helps you visualise missing data and data types.
+
+```{r visdat}
+visdat::vis_dat(pokemon)
+```
+
+This clearly shows us the data types in each column, and where values are missing in context. It looks like habitat might just not be available after a certain time. It also looks like `colour`, `shape`, `generation_id` and `evolution_chain_id` looks like they are maybe all missing from the same individual Pokemon?
+
+## Go, Naniar!
+
+`Naniar` helps us check through plots where relationships between missing values and other variables might occur. Lets check first if there is a relationship between `generation_id` and `evolution_chain_id`
+
+```{r naniar_missing_all}
+pokemon %>%
+  ggplot(aes(generation_id, evolution_chain_id)) +
+  geom_miss_point()
+```
+
+This plot might need a little explanation. For the `Not Missing` blue values, this is a normal `geom_point()`. However, where the values are marked as `Missing` pink they are deliberately moved below the `(0,0)` mark for the _axis they are missing values for_, then they 'jitter', to avoid over-plotting. The little cluster at the far bottom left in a line marks that for _all_ values where `evolution_chain_id` being missing, `generation_id` is also missing. Let's have a look at the `evolves_from_species_id` variable just to help us understand.
+
+```{r naniar_missing_half}
+pokemon %>%
+  ggplot(aes(evolves_from_species_id, generation_id)) +
+  geom_miss_point()
+```
+
+This is showing that in every game generation (Red/Blue, X/Y, etc.) that there are Pokemon that have an `evolves_from_species_id`, i.e. they have a precursor Pokemon, and that there are also Pokemon that _don't_ have a precursor. Just what we see in the games. It's also showing that have neither `generation_id` or `evolves_from_species_id`.
+
+## Who is that Pokemon?
+
+Now we know the characteristics of the missing data we are interested in, we can pull them out easily. Especially with the newly released [`across()` function](https://dplyr.tidyverse.org/articles/colwise.html)
+
+```{r missing_pokes}
+missing_cols <- c("color", "shape", "generation_id", "evolves_from_species_id")
+pokemon %>% 
+  filter(across(missing_cols, ~is.na(.x))) %>% 
+  select(name, identifier, missing_cols) -> missing_pokes
+
+missing_pokes
+```
+
+So it looks like in the current version of the package, these Pokemon all have 'complex' identifiers. This is because these Pokemon all have different forms. Some vary by colour like [Basculin](https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_with_form_differences#Basculin) which can be Red or Blue striped, others have ability transformations, like [Aegislash](https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_with_form_differences#Aegislash) or which game it was caught in like [Deoxys](https://bulbapedia.bulbagarden.net/wiki/List_of_Pok%C3%A9mon_with_form_differences#Deoxys).
+
+```{r species_mismatch}
+missing_pokes %>% 
+  pull(name) %>% 
+  stringr::str_to_lower(.) -> missing_pokes_name_list
+
+pokedex$pokemon_species %>%
+  filter(
+    stringr::str_to_lower(identifier) %in% missing_pokes_name_list
+    ) %>% 
+  select(identifier, generation_id, evolves_from_species_id, shape_id, color_id)
+```
+
+If we go back to the raw source data, we can see that the data is actually there for most cases, it just didn't join properly because in the source data, they are identified by the simple name, in lower case, and in [this version of the package](https://github.com/DaveParr/pokedex/blob/ebe078c291ffa4eb757d09e0641553de63c5a530/data-raw/pokemon.R#L59-L61) this data is joined on `id` AND the column that actually has the complex name. Also, because shape and color link _through_ this data, they are missed as well!
+
+## You defeated wild missingno!
+
+This is all based on my Pokedex R data package.
+
+{% github daveparr/pokedex %}
+
+You can check the commits and see the solution...
