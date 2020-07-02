@@ -1,0 +1,33 @@
+---
+title: "Predicting pokemon power"
+description: "a description"
+series: "a series"
+tags: ["tag1", "tag2"]
+output: github_document
+---
+
+```{r setup, message = FALSE}
+library(pokedex)
+library(tidyverse)
+```
+
+```{r}
+pokemon %>% 
+  group_by(generation_id) %>%
+  skimr::skim_without_charts()
+```
+## How strong is any given Pokemon?
+
+Pokemon games have a very familiar cycle. You start with one of 3 Pokemon. You adventure out with your new buddy, facing tougher and tougher Pokemon, in greater variety. Many of your Pokemon evolve over time, and eventually you find the end-game legendaries in a climactic battle of titans! 
+
+```{r}
+pokemon %>%
+  ggplot(aes(
+    x = id,
+    y = base_experience
+  )) +
+  geom_point() +
+  facet_wrap( ~ generation_id, scales = "free_x", ncol = 1)
+```
+
+
