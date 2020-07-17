@@ -14,15 +14,9 @@ library(showtext)
 font_add_google("Press Start 2P")
 showtext_auto()
 
-theme_pokedex <- function () {
-  theme_minimal() %+replace%
-    theme(
-      text = element_text(family = "Press Start 2P"),
-      axis.text.x = element_text(angle = -90)
-    )
-}
-
 theme_set(theme_pokedex())
+
+knitr::opts_chunk$set(fig.showtext=TRUE)
 ```
 
 ## The Heros Journey
@@ -31,7 +25,7 @@ Pokemon games have a very familiar cycle. You start with one of 3 Pokemon. You a
 
 You can even see this story in the data. Here is the `base_experience` of all the Pokemon, identified by game generation. The `base_experience` is the basic amount of experience that is gained by the winner of a battle from a specific species. e.g. If you _beat_ a Bulbasaur, your Pokemon _gains_ experience based on a formula which uses Bulbasaurs `base_experience`. Because of that we can see it as a proxy value for how _powerful_ a Pokemon is. If it's more powerful, it will be harder to beat, and so reward you with more experience when you win.
 
-```{r}
+```{r plot base experience}
 pokemon %>%
   ggplot(aes(x = id, y = base_experience, colour = generation_id)) +
   geom_point() +
@@ -50,7 +44,7 @@ Lets see if we can group each Pokemon into a `power_level`. A categorical groupi
 
 Maybe we can explicitly describe the power levels of each tier of Pokemon with a simple process? Can we group each Pokemon by evolutionary chain, and then count each Pokemons order within the group?
 
-```{r}
+```{r plot by group count}
 pokemon %>%
   group_by(evolution_chain_id) %>%
   mutate(power_level = row_number()) -> pokemon_group_count
@@ -68,9 +62,9 @@ ggplot(pokemon_group_count,
 
 Sort of? Generally we capture the pattern, but we don't actually get it very right. First off, there are more than 3 evolutionary tiers in our engineered feature. We can also see there are some Pokemon are classified as a `power_level` higher than 1, but still in the lowest group on this list. Why might have caused this?
 
-```{r}
-pokemon_group_count %>% 
-  filter(power_level > 3) %>% 
+```{r table of group count mistakes}
+pokemon_group_count %>%
+  filter(power_level > 3) %>%
   pull(evolution_chain_id) -> pokemon_group_count_mistakes
 
 pokemon_group_count %>%
@@ -81,7 +75,8 @@ pokemon_group_count %>%
          generation_id,
          evolution_chain_id,
          power_level)  %>%
-  arrange(evolution_chain_id) %>% 
+  arrange(evolution_chain_id) %>%
+  select(id, name, base_experience, evolution_chain_id, power_level) %>% 
   knitr::kable()
 ```
 
@@ -95,7 +90,7 @@ Each Pokemon that evolves from another Pokemon has the Pokemon they evolve froms
 
 > The following code is not my best work, however I spent some time on a more recursive strategy, but it was honestly miles more confusing. For the purposes of a silly example for a blog, I think this is prefferable.
 
-```{r}
+```{r plot by evolves_from}
 pokemon %>%
   mutate(power_level = case_when(is.na(evolves_from_species_id) ~ 1)) %>%
   filter(power_level == 1) -> pokemon_1
@@ -129,7 +124,7 @@ pokemon_evolves_from %>%
 
 So these Pokemon are nearly all 'Legendary'. They are big end-game Pokemon, with real rarity in game. They also don't evolve from, or to, anything, so our rule doesn't classify them effectively.
 
-```{r}
+```{r table of evolve_from mistakes}
 pokemon_evolves_from %>% 
   filter(base_experience < 200 & base_experience > 100 & power_level == 1) %>% 
   select(id, name, base_experience) %>% 
@@ -144,7 +139,7 @@ So our 'group count' process doesn't work well, and neither does our '`evolves_f
 
 Clustering is the process of using machine learning to derive a categorical variable from data. The simplest form of clustering that seems relevant to our problem is k-means. Seeing as we have a pretty good intuition that 3 groups _implicitly_ exist in this data, and a clear _visualisation_ supporting us, lets cut straight to asking R for 3 groups. k-means clustering aims to divide the data into a _known_ number of groups which is set in the `centers` argument, and doesn't require any data to be fed to it as examples of what makes up a 'group'. That sentence might be a little confusing, as we do obviously give it some data. What we _don't_ give it is a training data set which has examples of what Pokemon are supposed to be in a given group, labelled with the group they are supposed to be in, e.g. Squirtle is in group 1, Wartortle is in group 2, Blastoise is in group 3, and then give it unlabelled data to classify, e.g. "What group is Charmeleon in?". k-means will _figure out_ how to split the continuous variable `base_experience` into 3 groups.
 
-```{r}
+```{r kmeans cluster}
 set.seed(68)
 
 pokemon %>% 
@@ -175,7 +170,7 @@ Here, I've simply selected the one column of data, `base_experience`, and piped 
 
 `augment` helps us to match the output of the `kmeans` function back to our data for easier processing. The output of `kmeans` doesn't actually contain any of the other information about our data, it only got given one column remember? `augment` goes through the return of `kmeans`, finds the relevant bit, and matches it neatly back to our original data  ready for plotting in one step!
 
-```{r}
+```{r plot cluster}
 pokemon_cluster %>% 
   ggplot(aes(x = id, y = base_experience, colour = .cluster)) +
   geom_point() +
@@ -186,14 +181,14 @@ This is a _lot_ better. It gives us really clear groups, in exactly where we exp
 
 Lets check some of our boundary positions, just to make sure it makes sense.
 
-```{r}
+```{r cluster boundary 1}
 pokemon_cluster %>% 
   filter(.cluster == 1 & base_experience > 100) %>% 
   select(id, name, base_experience) %>% 
   knitr::kable()
 ```
 
-```{r}
+```{r cluster boundary 2}
 pokemon_cluster %>% 
   filter(.cluster == 2 & base_experience > 200) %>% 
   select(id, name, base_experience) %>% 
